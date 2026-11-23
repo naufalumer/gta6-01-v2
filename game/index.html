@@ -1,0 +1,245 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>AZURA BAY — Neon Tide</title>
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+  html, body { width:100%; height:100%; overflow:hidden; background:#0b0e1a; }
+  body { font-family:"Segoe UI", Arial, Helvetica, sans-serif; color:#f2f5ff; user-select:none; }
+  #app { position:fixed; inset:0; }
+  canvas#gl { position:absolute; inset:0; width:100%; height:100%; display:block; filter:saturate(1.18) contrast(1.06); }
+  #vignette { position:absolute; inset:0; pointer-events:none; z-index:3;
+    background:radial-gradient(ellipse at center, transparent 52%, rgba(6,4,20,.38) 100%); }
+  #grade { position:absolute; inset:0; pointer-events:none; z-index:3; mix-blend-mode:overlay; opacity:.16;
+    background:linear-gradient(180deg, rgba(255,120,180,.35), transparent 40%, transparent 65%, rgba(20,220,255,.30)); }
+  #flash { position:absolute; inset:0; pointer-events:none; z-index:4; background:radial-gradient(ellipse at center, transparent 55%, rgba(255,30,40,.55) 100%); opacity:0; transition:opacity .12s; }
+  .panel { background:rgba(8,12,28,.78); border:1.5px solid rgba(120,220,255,.45); border-radius:6px;
+    box-shadow:0 2px 14px rgba(0,0,0,.55); backdrop-filter:blur(2px); }
+  .accent { color:#ffd23e; } .teal { color:#37e6ff; } .pink { color:#ff5fa2; }
+  
+  #hud { position:absolute; inset:0; pointer-events:none; z-index:5; font-size:13px; }
+  #mission { position:absolute; top:10px; left:10px; width:248px; padding:8px 10px 7px; border-left:4px solid #ffd23e; }
+  #mission .m-top { display:flex; justify-content:space-between; align-items:baseline; }
+  #m-title { font-weight:900; font-size:15px; letter-spacing:.5px; color:#ffd23e; text-transform:uppercase; }
+  #m-timer { font-weight:900; font-size:15px; color:#ff5f6d; background:rgba(255,60,70,.18); padding:1px 6px; border-radius:4px; }
+  #m-progress { font-size:11px; color:#9fd8ff; margin-top:1px; }
+  #m-objective { font-weight:700; font-size:13px; margin-top:3px; }
+  #m-next { font-size:11px; color:#b9c4e8; margin-top:1px; }
+  #m-next b { color:#ffd23e; }
+  #m-crew { display:flex; gap:5px; margin-top:6px; }
+  .crew { display:flex; align-items:center; gap:4px; background:rgba(255,255,255,.07); border-radius:4px; padding:2px 5px 2px 2px; font-size:10px; font-weight:700; }
+  .crew i { width:18px; height:18px; border-radius:3px; display:inline-flex; align-items:center; justify-content:center; font-style:normal; font-size:11px; color:#06101f; }
+  .crew small { display:block; font-size:8px; color:#9fd8ff; font-weight:600; letter-spacing:.4px; }
+  #radio { position:absolute; top:10px; left:50%; transform:translateX(-50%); padding:5px 14px; text-align:center; border-color:rgba(255,95,162,.55); }
+  #radio-name { font-weight:900; font-size:12px; letter-spacing:1px; color:#ff5fa2; }
+  #radio-song { font-size:11px; color:#e8ecff; }
+  #status { position:absolute; top:10px; right:10px; width:236px; padding:8px 10px 7px; text-align:right; border-right:4px solid #37e6ff; }
+  #status .row1 { display:flex; justify-content:space-between; align-items:baseline; }
+  #clock { font-weight:900; font-size:14px; }
+  #cash { font-weight:900; font-size:17px; color:#ffd23e; }
+  #stars { font-size:17px; letter-spacing:2px; color:#ffd23e; text-shadow:0 0 8px rgba(255,210,62,.8); margin:2px 0 0; }
+  #stars .off { color:rgba(255,255,255,.22); text-shadow:none; }
+  #sight { display:inline-block; font-size:10px; font-weight:900; letter-spacing:1px; padding:1px 6px; border-radius:3px; background:#ff3b4d; color:#fff; }
+  #sight.lost { background:#2fbf71; }
+  #respect { font-size:11px; font-weight:700; color:#9fd8ff; margin-top:2px; }
+  #patrol { margin-top:5px; text-align:left; font-size:11px; }
+  #patrol .ph { font-size:10px; font-weight:900; letter-spacing:1px; color:#37e6ff; border-bottom:1px solid rgba(120,220,255,.35); padding-bottom:2px; margin-bottom:2px; }
+  #patrol .pu { display:flex; justify-content:space-between; gap:6px; padding:1px 0; }
+  #patrol .pu b { color:#e8ecff; } #patrol .pu span { color:#ffd23e; font-weight:700; }
+  #patrol .pu em { font-style:normal; color:#ff8fa3; font-weight:700; }
+  #minimap-wrap { position:absolute; left:10px; bottom:10px; width:168px; }
+  #minimap { width:168px; height:168px; border-radius:50%; border:3px solid rgba(255,210,62,.85); box-shadow:0 0 0 3px rgba(8,12,28,.8), 0 4px 16px rgba(0,0,0,.6); display:block; background:#0d2b45; }
+  #district { position:absolute; left:0; top:-22px; font-weight:900; font-size:12px; letter-spacing:1px; color:#fff;
+    background:rgba(8,12,28,.8); border-left:3px solid #ffd23e; padding:2px 8px; border-radius:3px; text-transform:uppercase; }
+  #drive { position:absolute; right:10px; bottom:10px; width:212px; padding:8px 10px; text-align:right; border-right:4px solid #ff5fa2; }
+  #weapon { font-weight:900; font-size:12px; color:#e8ecff; }
+  #weapon span { color:#ffd23e; }
+  #veh-name { font-size:11px; color:#9fd8ff; font-weight:700; }
+  #speed { font-weight:900; font-size:42px; line-height:.95; color:#fff; }
+  #speed small { font-size:13px; color:#9fd8ff; }
+  .bar-row { display:flex; align-items:center; gap:6px; justify-content:flex-end; margin-top:3px; font-size:10px; font-weight:900; }
+  .bar { width:120px; height:9px; background:rgba(255,255,255,.14); border-radius:5px; overflow:hidden; }
+  .bar > div { height:100%; }
+  #condition { font-size:11px; color:#e8ecff; font-weight:700; margin-top:2px; }
+  #dialog { position:absolute; left:50%; bottom:14px; transform:translateX(-50%); width:430px; max-width:52vw;
+    padding:8px 12px 8px 10px; display:none; border-left:4px solid #37e6ff; }
+  #dialog .d-head { display:flex; align-items:center; gap:8px; }
+  #dlg-face { width:30px; height:30px; border-radius:4px; display:flex; align-items:center; justify-content:center; font-weight:900; font-size:15px; color:#06101f; }
+  #dlg-name { font-weight:900; font-size:13px; } #dlg-name small { color:#9fd8ff; font-size:11px; }
+  #dlg-text { font-size:13px; margin-top:2px; line-height:1.3; }
+  #prompt { position:absolute; left:50%; top:56%; transform:translateX(-50%); font-weight:900; font-size:15px;
+    background:rgba(8,12,28,.85); border:1.5px solid #ffd23e; color:#fff; padding:6px 14px; border-radius:5px; display:none; white-space:nowrap; }
+  #prompt b { color:#ffd23e; background:rgba(255,210,62,.16); border:1px solid #ffd23e; border-radius:3px; padding:0 6px; margin-right:6px; }
+  #crosshair { position:absolute; left:50%; top:50%; width:22px; height:22px; margin:-11px 0 0 -11px; display:none; }
+  #crosshair:before, #crosshair:after { content:""; position:absolute; background:#fff; box-shadow:0 0 4px #000; }
+  #crosshair:before { left:10px; top:0; width:2px; height:22px; } #crosshair:after { left:0; top:10px; width:22px; height:2px; }
+  #toast { position:absolute; left:50%; top:96px; transform:translateX(-50%); font-weight:900; font-size:15px; color:#ffd23e;
+    text-shadow:0 2px 6px #000; display:none; text-align:center; }
+  
+  .screen { position:absolute; inset:0; z-index:10; display:none; align-items:center; justify-content:center; flex-direction:column; text-align:center; }
+  .screen.on { display:flex; }
+  #title { background:linear-gradient(180deg, rgba(8,10,26,.25) 0%, rgba(8,10,26,.55) 70%, rgba(8,10,26,.85) 100%); }
+  #title h1 { font-size:min(74px, 11vw); font-weight:900; letter-spacing:2px; line-height:.95; color:#fff;
+    text-shadow:0 0 24px rgba(255,95,162,.75), 0 4px 0 rgba(0,0,0,.35); }
+  #title h1 span { color:#ff5fa2; } #title h1 em { color:#37e6ff; font-style:normal; }
+  #title h2 { font-size:min(22px, 3.4vw); letter-spacing:6px; color:#ffd23e; margin-top:6px; font-weight:900; }
+  #title p.sub { margin-top:10px; font-size:14px; color:#cdd8ff; max-width:560px; line-height:1.45; }
+  .btn { pointer-events:auto; cursor:pointer; font-weight:900; letter-spacing:1px; font-size:16px; color:#06101f;
+    background:#ffd23e; border:none; border-radius:6px; padding:12px 34px; margin-top:14px; box-shadow:0 4px 0 #b98f00, 0 6px 18px rgba(0,0,0,.5); }
+  .btn:active { transform:translateY(3px); box-shadow:0 1px 0 #b98f00; }
+  .btn.ghost { background:rgba(255,255,255,.12); color:#fff; box-shadow:0 4px 0 rgba(0,0,0,.4); border:1.5px solid rgba(255,255,255,.4); }
+  .btn.small { font-size:13px; padding:9px 20px; margin-top:8px; }
+  #howto { display:none; margin-top:14px; font-size:13px; line-height:1.7; color:#e8ecff; background:rgba(8,12,28,.85);
+    border:1.5px solid rgba(120,220,255,.45); border-radius:6px; padding:12px 18px; text-align:left; max-width:520px; }
+  #howto b { color:#ffd23e; }
+  .dim { background:rgba(5,7,18,.72); backdrop-filter:blur(3px); }
+  .screen h2.big { font-size:40px; font-weight:900; letter-spacing:2px; }
+  .screen .fine { font-size:14px; color:#cdd8ff; margin-top:8px; line-height:1.5; max-width:480px; }
+  
+  #mapscreen .mapwrap { display:flex; gap:14px; align-items:stretch; margin-top:12px; }
+  #map-canvas { width:min(560px, 58vw); height:min(560px, 68vh); border:3px solid rgba(255,210,62,.85); border-radius:8px; background:#0d2b45; }
+  #map-side { width:250px; text-align:left; padding:12px 14px; }
+  #map-side h3 { color:#ffd23e; font-size:20px; letter-spacing:1px; }
+  #map-side .stat { display:flex; justify-content:space-between; font-size:13px; padding:3px 0; border-bottom:1px solid rgba(255,255,255,.08); }
+  #map-side .stat b { color:#ffd23e; }
+  #map-side h4 { color:#37e6ff; font-size:12px; letter-spacing:1px; margin:10px 0 4px; }
+  #map-side .key { font-size:12px; line-height:1.8; color:#dfe6ff; }
+  
+  .shop { width:min(680px, 92vw); max-height:86vh; overflow:auto; padding:16px 20px; text-align:left; }
+  .shop h3 { font-size:24px; color:#ffd23e; letter-spacing:1px; }
+  .shop .sub { font-size:12px; color:#9fd8ff; margin:2px 0 10px; }
+  .shop .cols { display:flex; gap:16px; }
+  .shop .col { flex:1; }
+  .shop h4 { color:#37e6ff; font-size:12px; letter-spacing:1px; border-bottom:1px solid rgba(120,220,255,.35); padding-bottom:3px; margin-bottom:4px; }
+  .item { display:flex; justify-content:space-between; gap:8px; padding:6px 8px; border-radius:5px; cursor:pointer; font-size:13px; font-weight:700; }
+  .item:hover { background:rgba(255,255,255,.09); }
+  .item.sel { background:rgba(255,210,62,.18); outline:1.5px solid #ffd23e; }
+  .item .price { color:#ffd23e; white-space:nowrap; }
+  .item .owned { color:#2fbf71; font-size:11px; }
+  .item .tag { font-size:10px; color:#37e6ff; }
+  #garage-desc, #shop-desc { font-size:12px; color:#cdd8ff; margin-top:8px; min-height:32px; line-height:1.4; }
+  #garage-car { font-size:13px; font-weight:700; margin-bottom:8px; }
+  #garage-car b { color:#ffd23e; }
+  
+  #casino .slots { display:flex; gap:10px; margin:14px 0 6px; }
+  .reel { width:84px; height:96px; background:#fff; color:#111; font-size:52px; display:flex; align-items:center; justify-content:center; border-radius:10px; border:4px solid #ffd23e; }
+  #casino-cash { font-size:15px; font-weight:900; color:#ffd23e; }
+  
+  #touch { position:absolute; inset:0; z-index:6; pointer-events:none; display:none; }
+  #stick { position:absolute; left:26px; bottom:190px; width:120px; height:120px; border-radius:50%; background:rgba(255,255,255,.10);
+    border:2px solid rgba(255,255,255,.35); pointer-events:auto; }
+  #stick-knob { position:absolute; left:38px; top:38px; width:44px; height:44px; border-radius:50%; background:rgba(255,210,62,.85); }
+  .tbtn { position:absolute; width:64px; height:64px; border-radius:50%; background:rgba(8,12,28,.7); border:2px solid rgba(255,255,255,.5);
+    color:#fff; font-weight:900; font-size:12px; display:flex; align-items:center; justify-content:center; pointer-events:auto; }
+  #btn-fire { right:26px; bottom:120px; border-color:#ff5f6d; } #btn-jump { right:104px; bottom:200px; }
+  #btn-enter { right:104px; bottom:96px; } #btn-use { right:190px; bottom:120px; }
+  @media (max-width:900px) {
+    #mission { width:200px; } #status { width:196px; } #minimap { width:128px; height:128px; }
+    #minimap-wrap { width:128px; } #dialog { width:340px; } #speed { font-size:34px; }
+  }
+</style>
+</head>
+<body>
+<div id="app">
+  <canvas id="gl"></canvas>
+  <div id="grade"></div><div id="vignette"></div><div id="flash"></div>
+  <div id="hud">
+    <div id="mission" class="panel">
+      <div class="m-top"><span id="m-title">AZURA BAY</span><span id="m-timer"></span></div>
+      <div id="m-progress"></div><div id="m-objective">Welcome to Azura Bay.</div>
+      <div id="m-next"></div><div id="m-crew"></div>
+    </div>
+    <div id="radio" class="panel"><div id="radio-name">TIDE FM 98.6</div><div id="radio-song">Neon Tideline — Azura Nights</div></div>
+    <div id="status" class="panel">
+      <div class="row1"><span id="clock">18:45</span><span id="cash">$500</span></div>
+      <div id="stars"></div><div><span id="sight" style="display:none">IN SIGHT</span></div>
+      <div id="respect">RESPECT LV 1 · DRIFTER</div>
+      <div id="patrol"></div>
+    </div>
+    <div id="minimap-wrap"><div id="district">SUNDIAL SQUARE</div><canvas id="minimap" width="336" height="336"></canvas></div>
+    <div id="drive" class="panel">
+      <div id="weapon">PISTOL <span>12 / 120</span></div><div id="veh-name">ON FOOT</div>
+      <div id="speed">0<small> KM/H</small></div><div id="condition"></div>
+      <div class="bar-row">ARMOR <div class="bar"><div id="armor-bar" style="width:0%;background:#37e6ff"></div></div><span id="armor-num">0</span></div>
+      <div class="bar-row">HEALTH <div class="bar"><div id="health-bar" style="width:100%;background:#ff5f6d"></div></div><span id="health-num">100</span></div>
+    </div>
+    <div id="dialog" class="panel"><div class="d-head"><div id="dlg-face">L</div><div><div id="dlg-name">LENA <small>· planner</small></div></div></div><div id="dlg-text"></div></div>
+    <div id="prompt"></div><div id="crosshair"></div><div id="toast"></div>
+  </div>
+  <div id="touch">
+    <div id="stick"><div id="stick-knob"></div></div>
+    <div class="tbtn" id="btn-fire">FIRE</div><div class="tbtn" id="btn-jump">JUMP</div>
+    <div class="tbtn" id="btn-enter">ENTER</div><div class="tbtn" id="btn-use">USE</div>
+  </div>
+  <div id="title" class="screen on">
+    <h1>AZURA <span>BAY</span><br><em>NEON TIDE</em></h1>
+    <h2>OPEN-WORLD CRIME · AZURA BAY</h2>
+    <p class="sub">Six story jobs. Street races. The Harbor Syndicate. Bay Patrol on your tail from one star to five. Steal it, race it, lose the heat — and own the bay.</p>
+    <button class="btn" id="btn-play">▶ &nbsp;PLAY</button>
+    <button class="btn ghost" id="btn-continue" style="display:none">CONTINUE</button>
+    <button class="btn ghost" id="btn-howto">HOW TO PLAY</button>
+    <div id="howto"><b>WASD / arrows</b> — move &amp; drive &nbsp;·&nbsp; <b>Mouse</b> — look / aim, <b>click</b> — fire<br>
+    <b>F</b> — enter / exit vehicle &nbsp;·&nbsp; <b>E</b> — interact &nbsp;·&nbsp; <b>Space</b> — handbrake / jump / jetpack<br>
+    <b>Shift</b> — nitro / sprint &nbsp;·&nbsp; <b>1 / 2 / 3</b> — weapons &nbsp;·&nbsp; <b>R</b> — reload &nbsp;·&nbsp; <b>Q</b> — radio<br>
+    <b>M</b> — map &nbsp;·&nbsp; <b>Esc</b> — pause &nbsp;·&nbsp; Touch: left stick + FIRE / JUMP / ENTER / USE</div>
+  </div>
+  <div id="pause" class="screen dim">
+    <h2 class="big">PAUSED</h2><p class="fine">Azura Bay waits for no one. Well — right now it does.</p>
+    <button class="btn" id="btn-resume">RESUME</button>
+    <button class="btn ghost" id="btn-save">SAVE GAME</button>
+    <button class="btn ghost" id="btn-quit">QUIT TO TITLE</button>
+  </div>
+  <div id="mapscreen" class="screen dim">
+    <div class="mapwrap">
+      <canvas id="map-canvas" width="1120" height="1120"></canvas>
+      <div id="map-side" class="panel">
+        <h3>AZURA BAY</h3>
+        <div class="stat"><span>RESPECT</span><b id="map-respect">LV 1 · DRIFTER</b></div>
+        <div class="stat"><span>CASH</span><b id="map-cash">$500</b></div>
+        <div class="stat"><span>JOBS DONE</span><b id="map-jobs">0 / 6</b></div>
+        <div class="stat"><span>COMPLETE</span><b id="map-complete">0%</b></div>
+        <h4>THE CREW</h4><div id="map-crew"></div>
+        <h4>MAP KEY</h4><div class="key">🏠 Safehouse &nbsp;·&nbsp; 🔧 Garage &nbsp;·&nbsp; 🏁 Street race<br>
+        💼 Next job &nbsp;·&nbsp; ✚ Clinic &nbsp;·&nbsp; 🎣 Pier 9 &nbsp;·&nbsp; 🏀 Court<br>
+        👮 Precinct &nbsp;·&nbsp; ⭐ Wanted &nbsp;·&nbsp; 📦 Package</div>
+        <h4>LIFETIME</h4><div class="key" id="map-stats"></div>
+        <button class="btn small" id="btn-map-resume">RESUME</button>
+        <button class="btn ghost small" id="btn-map-save">SAVE</button>
+        <button class="btn ghost small" id="btn-map-menu">MENU</button>
+      </div>
+    </div>
+  </div>
+  <div id="garage" class="screen dim"><div class="shop panel">
+    <h3 id="garage-title">TIDEWORKS CUSTOMS</h3><div class="sub">Rico's garage — "You break it, I bill it." — Dax, mechanic</div>
+    <div id="garage-car"></div><div class="cols"><div class="col"><h4>CAR UPGRADES</h4><div id="garage-upgrades"></div></div>
+    <div class="col"><h4>WEAPONS &amp; GEAR</h4><div id="garage-weapons"></div></div></div>
+    <div id="garage-desc"></div><button class="btn small" id="btn-garage-leave">BACK TO THE STREET</button>
+  </div></div>
+  <div id="shop" class="screen dim"><div class="shop panel">
+    <h3>IRONWORKS ARMS</h3><div class="sub">Licensed dealer. Mostly licensed. Cash only, no questions.</div>
+    <div class="cols"><div class="col"><h4>WEAPONS</h4><div id="shop-weapons"></div></div>
+    <div class="col"><h4>GEAR &amp; AMMO</h4><div id="shop-gear"></div></div></div>
+    <div id="shop-desc"></div><button class="btn small" id="btn-shop-leave">LEAVE</button>
+  </div></div>
+  <div id="casino" class="screen dim">
+    <h2 class="big" style="color:#ffd23e">CORAL CROWN</h2><p class="fine">One spin is $50. The house always wins — except when it doesn't.</p>
+    <div class="slots"><div class="reel" id="slot1">🍒</div><div class="reel" id="slot2">⭐</div><div class="reel" id="slot3">💎</div></div>
+    <div id="casino-cash">$500</div><div id="casino-msg" class="fine"></div>
+    <button class="btn" id="btn-spin">SPIN — $50</button>
+    <button class="btn ghost" id="btn-casino-leave">CASH OUT</button>
+  </div>
+  <div id="busted" class="screen dim">
+    <h2 class="big" style="color:#37e6ff">BUSTED</h2><p class="fine">Bay Patrol took you in. Bail was posted — minus a fine and your pride.</p>
+    <button class="btn" id="btn-busted-retry">BACK ON THE STREET</button>
+  </div>
+  <div id="wasted" class="screen dim">
+    <h2 class="big" style="color:#ff5f6d">WASTED</h2><p class="fine">The bay keeps what it takes. The clinic patched you up — for a fee.</p>
+    <button class="btn" id="btn-wasted-retry">BACK ON THE STREET</button>
+  </div>
+</div>
+<script type="importmap">{"imports":{"three":"./vendor/three.module.min.js"}}</script>
+<script type="module" src="./src/main.js"></script>
+</body>
+</html>
